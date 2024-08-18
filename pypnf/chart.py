@@ -161,7 +161,7 @@ class PointFigureChart:
 
         # counts
         self.counts = None
-        self.show_counts = True  # 'vertical', 'horizontal', 'all'
+        self.show_counts = False  # 'vertical', 'horizontal', 'all'
         self.show_last_counts = False  # integer
         self.bullish_count_color = 'b'
         self.bearish_count_color = 'r'
@@ -1178,6 +1178,11 @@ class PointFigureChart:
 
         breakouts: dict
             The dict contains following keys:
+        breakouts['date']:
+            Array of int/dates: Dates when the breakouts occurred. If no date provided in the time series
+            this array is equal to breakouts['ts index'].
+        breakouts['ts index']:
+            Array of int: Indices of the time series of when a breakout occurs.
         breakouts['trend']:
             Array of int: 1 for bullish breakouts and -1 for bearish breakouts
         breakouts['type']:
@@ -1216,18 +1221,19 @@ class PointFigureChart:
         row_bear, col_bear = np.where(T == -1)
 
         # initiate dictionary
-        keys = ['ts index','trend', 'type', 'column index', 'box index', 'hits', 'width', 'outer width']
+        keys = ['date', 'ts index','trend', 'type', 'column index', 'box index', 'hits', 'width', 'outer width']
         bo = {}
         for key in keys:
             bo[key] = np.zeros(np.size(row_bull) + np.size(row_bear)).astype(int)
+
         bo['type'] = bo['type'].astype(str)
 
         if isinstance(self.ts['date'][0], np.datetime64):
-            bo['ts index'] = bo['ts index'].astype(f'''datetime64[{self.time_step}]''')
+            bo['date'] = bo['date'].astype(f'''datetime64[{self.time_step}]''')
         elif isinstance(self.ts['date'][0], str):
-            bo['ts index'] = bo['ts index'].astype(f'''datetime64[{self.time_step}]''')
+            bo['date'] = bo['date'].astype(f'''datetime64[{self.time_step}]''')
         else:
-            bo['ts index'] = bo['ts index'].astype(int)
+            bo['date'] = bo['date'].astype(int)
 
         # assign trends
         bo['trend'][0:np.size(row_bull)] = 1
@@ -1240,7 +1246,17 @@ class PointFigureChart:
 
                 bo['box index'][n] = row_bull[n]
                 bo['column index'][n] = col_bull[n]
-                bo['ts index'][n] = self.ts['date'][self.action_index_matrix[row_bull[n], col_bull[n]]]
+                bo['date'][n] = self.ts['date'][self.action_index_matrix[row_bull[n], col_bull[n]]]
+
+                # look here for the index in case there is a date given
+                if isinstance(self.ts['date'][0], np.datetime64):
+                    index = np.where(self.ts['date']==bo['date'][n])[0][0]
+                    bo['ts index'][n] = index
+                elif isinstance(self.ts['date'][0], str):
+                    index = np.where(self.ts['date'] == bo['date'][n])[0][0]
+                    bo['ts index'][n] = index
+                else:
+                    bo['ts index'][n] = bo['date'][n].astype(int)
 
                 hRL = mtx[row_bull[n] - 1, 0:col_bull[n] + 1]  # horizontal resistance line
                 boL = mtx[row_bull[n], 0:col_bull[n] + 1]  # breakout line
@@ -1318,6 +1334,7 @@ class PointFigureChart:
                         bo['hits'] = np.append(bo['hits'], np.sum(mtx[row_bull[n] - 1, k[p]:k[-1] + 1]))
                         bo['width'] = np.append(bo['width'], [k[-1] - k[p] + 1])
                         bo['outer width'] = np.append(bo['outer width'], bo['outer width'][n])
+                        bo['date'] = np.append(bo['date'], bo['date'][n])
                         bo['ts index'] = np.append(bo['ts index'], bo['ts index'][n])
 
         # bearish breakouts
@@ -1327,8 +1344,18 @@ class PointFigureChart:
 
                 bo['box index'][np.size(row_bull) + n] = row_bear[n]
                 bo['column index'][np.size(row_bull) + n] = col_bear[n]
-                bo['ts index'][np.size(row_bull) + n] = self.ts['date'][self.action_index_matrix[row_bear[n], col_bear[n]]]
+                bo['date'][np.size(row_bull) + n] = self.ts['date'][self.action_index_matrix[row_bear[n], col_bear[n]]]
                 #bo['ts index'][np.size(row_bull) + n] = self.ts['date'][self.action_index_matrix[row_bull[n], col_bull[n]]]
+
+                # look here for the index in case there is a date given
+                if isinstance(self.ts['date'][0], np.datetime64):
+                    index = np.where(self.ts['date']==bo['date'][np.size(row_bull) + n])[0][0]
+                    bo['ts index'][np.size(row_bull) + n] = index
+                elif isinstance(self.ts['date'][0], str):
+                    index = np.where(self.ts['date'] == bo['date'][np.size(row_bull) + n])[0][0]
+                    bo['ts index'][np.size(row_bull) + n] = index
+                else:
+                    bo['ts index'][np.size(row_bull) + n] = bo['date'][np.size(row_bull) + n].astype(int)
 
                 hRL = mtx[row_bear[n] + 1, 0:col_bear[n] + 1]  # horizontal resistance line
                 boL = mtx[row_bear[n], 0:col_bear[n] + 1]  # breakout line
@@ -1406,6 +1433,7 @@ class PointFigureChart:
                         bo['hits'] = np.append(bo['hits'], np.abs(np.sum(mtx[row_bear[n] + 1, k[p]:k[-1] + 1])))
                         bo['width'] = np.append(bo['width'], [k[-1] - k[p] + 1])
                         bo['outer width'] = np.append(bo['outer width'], bo['outer width'][np.size(row_bull) + n])
+                        bo['date'] = np.append(bo['date'], bo['date'][np.size(row_bull) + n])
                         bo['ts index'] = np.append(bo['ts index'], bo['ts index'][np.size(row_bull) + n])
 
         # find index without entries:
@@ -1425,7 +1453,7 @@ class PointFigureChart:
 
     def get_trendlines(self, length=4, mode='strong'):
         """
-        Gets trendlines of an PointfigChart object
+        Gets trendlines of an PointFigureChart object
 
         Parameter:
         ==========
@@ -1804,9 +1832,12 @@ class PointFigureChart:
         return tlines
 
     @classmethod
-    def _assign_counts_to_dict(cls, counts, n, trend, sort, column, row, box, anchor_column, anchor_box, length,
-                               target_idx, target, reward, risk1, risk2, ratio1, ratio2, percent_filled):
+    def _assign_counts_to_dict(cls, counts, n, date, ts_index ,trend, sort, column, row, box,
+                               anchor_column, anchor_box, length, target_idx, target, reward, risk1, risk2,
+                               ratio1, ratio2, percent_filled):
 
+        counts['date'][n] = date
+        counts['ts index'][n] = ts_index
         counts['trend'][n] = trend
         counts['type'][n] = sort
         counts['column index'][n] = column
@@ -1836,16 +1867,18 @@ class PointFigureChart:
         return percent_filled
 
     def counts_reversal_greater_1(self, counts):
-        #BO = self.breakouts
-        #mtx = self.matrix
+
         sort = 'vertical'
         # anchor point is row below anchor column
 
         n = 0
-        for column_index, box_index, width, trend in zip(self.breakouts['column index'],
-                                                         self.breakouts['box index'],
-                                                         self.breakouts['width'],
-                                                         self.breakouts['trend']):
+        for (date, ts_index, column_index,
+             box_index, width, trend) in zip(self.breakouts['date'],
+                                             self.breakouts['ts index'],
+                                             self.breakouts['column index'],
+                                             self.breakouts['box index'],
+                                             self.breakouts['width'],
+                                             self.breakouts['trend']):
 
             # slice of matrix containing the current outbreak
             # A = mtx[:, column_index - width + 1:column_index + 1].copy()
@@ -1885,7 +1918,7 @@ class PointFigureChart:
 
                     box = self.boxscale[box_index]
 
-                    counts = PointFigureChart._assign_counts_to_dict(counts, n, trend, sort, column_index, box_index, box,
+                    counts = PointFigureChart._assign_counts_to_dict(counts, n, date, ts_index, trend, sort, column_index, box_index, box,
                                                                      anchor_col, anchor_box, width, target_index, target,
                                                                      reward, risk1, risk2, ratio1, ratio2, perc_filled)
 
@@ -1926,7 +1959,7 @@ class PointFigureChart:
 
                     box = self.boxscale[box_index]
 
-                    counts = PointFigureChart._assign_counts_to_dict(counts, n, trend, sort, column_index, box_index, box,
+                    counts = PointFigureChart._assign_counts_to_dict(counts, n, date, ts_index ,trend, sort, column_index, box_index, box,
                                                                      anchor_col, anchor_box, width, target_index, target,
                                                                      reward, risk1, risk2, ratio1, ratio2, perc_filled)
 
@@ -1939,11 +1972,14 @@ class PointFigureChart:
         # risk 1 is row below the column before the breakout-column
         # risk 2 is row below the low of the pattern
 
-        for column_index, box_index, width, trend, pattern in zip(self.breakouts['column index'],
-                                                                  self.breakouts['box index'],
-                                                                  self.breakouts['outer width'],
-                                                                  self.breakouts['trend'],
-                                                                  self.breakouts['type']):
+        for (date, ts_index, column_index,
+             box_index, width, trend, pattern) in zip(self.breakouts['date'],
+                                                      self.breakouts['ts index'],
+                                                      self.breakouts['column index'],
+                                                      self.breakouts['box index'],
+                                                      self.breakouts['outer width'],
+                                                      self.breakouts['trend'],
+                                                      self.breakouts['type']):
 
             if trend == BULLISH and pattern == 'reversal' and width >= self.horizontal_count_min_len:
 
@@ -1977,7 +2013,7 @@ class PointFigureChart:
 
                 box = self.boxscale[box_index]
 
-                counts = PointFigureChart._assign_counts_to_dict(counts, n, trend, sort, column_index, box_index, box,
+                counts = PointFigureChart._assign_counts_to_dict(counts, n, date, ts_index, trend, sort, column_index, box_index, box,
                                                                  anchor_col, anchor_box, width, target_index, target,
                                                                  reward, risk1, risk2, ratio1, ratio2, perc_filled)
 
@@ -2015,16 +2051,16 @@ class PointFigureChart:
 
                 box = self.boxscale[box_index]
 
-                counts = PointFigureChart._assign_counts_to_dict(counts, n, trend, sort, column_index, box_index, box,
+                counts = PointFigureChart._assign_counts_to_dict(counts, n, date, ts_index, trend, sort, column_index, box_index, box,
                                                                  anchor_col, anchor_box, width, target_index, target,
                                                                  reward, risk1, risk2, ratio1, ratio2, perc_filled)
             n = n + 1
 
         return counts
 
-    def counts_reversal_is_1(self, counts):
+    def counts_reversal_equals_1(self, counts):
         BO = self.breakouts
-        # mtx = self.matrix
+
         sort = 'horizontal (base) R=1'
         # count row is row with most filled boxes
         # if more than one currently the highest for bullish and lowest for bearish
@@ -2034,8 +2070,14 @@ class PointFigureChart:
         # count_percent_filled is different here: perc filled of anchor row
 
         n = 0
-        for column_index, box_index, width, trend, pattern in zip(BO['column index'], BO['box index'], BO['outer width'],
-                                                             BO['trend'], BO['type']):
+        for (date, ts_index, column_index,
+             box_index, width, trend, pattern) in zip(BO['date'],
+                                                      BO['ts index'],
+                                                      BO['column index'],
+                                                      BO['box index'],
+                                                      BO['outer width'],
+                                                      BO['trend'],
+                                                      BO['type']):
 
             # slice of matrix containing the current outbreak
             # A = mtx[:, column_index - width + 1:column_index + 1].copy()
@@ -2076,7 +2118,7 @@ class PointFigureChart:
 
                 box = self.boxscale[box_index]
 
-                counts = PointFigureChart._assign_counts_to_dict(counts, n, trend, sort, column_index, box_index, box,
+                counts = PointFigureChart._assign_counts_to_dict(counts, n, date, ts_index, trend, sort, column_index, box_index, box,
                                                                  anchor_col, anchor_box, width, target_index, target,
                                                                  reward, risk1, risk2, ratio1, ratio2, perc_filled)
 
@@ -2115,7 +2157,7 @@ class PointFigureChart:
 
                 box = self.boxscale[box_index]
 
-                counts = PointFigureChart._assign_counts_to_dict(counts, n, trend, sort, column_index, box_index, box,
+                counts = PointFigureChart._assign_counts_to_dict(counts, n, date, ts_index, trend, sort, column_index, box_index, box,
                                                                  anchor_col, anchor_box, width, target_index, target,
                                                                  reward, risk1, risk2, ratio1, ratio2, perc_filled)
 
@@ -2127,8 +2169,14 @@ class PointFigureChart:
         # risk1 row under base of signal column
         # risk2 row under lowest low
 
-        for column_index, box_index, width, trend, pattern in zip(BO['column index'], BO['box index'], BO['outer width'],
-                                                             BO['trend'], BO['type']):
+        for (date, ts_index, column_index,
+             box_index, width, trend, pattern) in zip(BO['date'],
+                                                      BO['ts index'],
+                                                      BO['column index'],
+                                                      BO['box index'],
+                                                      BO['outer width'],
+                                                      BO['trend'],
+                                                      BO['type']):
 
             if trend == BULLISH and pattern == 'reversal' and width >= self.horizontal_count_min_len:
 
@@ -2161,9 +2209,10 @@ class PointFigureChart:
 
                 box = self.boxscale[box_index]
 
-                counts = PointFigureChart._assign_counts_to_dict(counts, n, trend, sort, column_index, box_index, box,
-                                                                 anchor_col, anchor_box, width, target_index, target,
-                                                                 reward, risk1, risk2, ratio1, ratio2, perc_filled)
+                counts = PointFigureChart._assign_counts_to_dict(counts, n, date, ts_index, trend, sort,
+                                                                 column_index, box_index, box, anchor_col, anchor_box,
+                                                                 width, target_index, target, reward, risk1, risk2,
+                                                                 ratio1, ratio2, perc_filled)
 
             if trend == BEARISH and pattern == 'reversal' and width >= self.horizontal_count_min_len:
 
@@ -2198,14 +2247,10 @@ class PointFigureChart:
 
                 box = self.boxscale[box_index]
 
-                counts = PointFigureChart._assign_counts_to_dict(counts, n,
-                                                                 trend, sort,
-                                                                 column_index, box_index, box,
-                                                                 anchor_col, anchor_box, width,
-                                                                 target_index, target, reward,
-                                                                 risk1, risk2,
-                                                                 ratio1, ratio2,
-                                                                 perc_filled)
+                counts = PointFigureChart._assign_counts_to_dict(counts, n, date, ts_index, trend, sort,
+                                                                 column_index, box_index, box, anchor_col, anchor_box,
+                                                                 width, target_index, target, reward,  risk1, risk2,
+                                                                 ratio1, ratio2, perc_filled)
 
             n = n + 1
 
@@ -2218,7 +2263,7 @@ class PointFigureChart:
 
         breakouts = self.breakouts
 
-        keys = ['column index', 'box index', 'box', 'trend', 'type', 'length', 'anchor column', 'anchor box',
+        keys = ['date', 'ts index','column index', 'box index', 'box', 'trend', 'type', 'length', 'anchor column', 'anchor box',
                 'target index', 'target', 'reward', 'risk 1', 'risk 2', 'ratio 1', 'ratio 2', 'quality']
 
         counts = {}
@@ -2227,7 +2272,11 @@ class PointFigureChart:
 
             counts[key] = np.zeros(2 * np.size(breakouts['column index']))  # double the length
 
-            if key == 'column' or key == 'row' or key == 'length' or key == 'anchor column' or key == 'anchor box':
+            if key == 'column' or key == 'row' or key == 'length' or key == 'anchor column':# or key == 'anchor box':
+
+                counts[key] = counts[key].astype(int)
+
+            elif key == 'column index' or key == 'box index' or key == 'target index' or key == 'ts index':
 
                 counts[key] = counts[key].astype(int)
 
@@ -2240,12 +2289,20 @@ class PointFigureChart:
 
                 counts[key][:] = np.nan
 
+            # check for format of date. If no dates is given format to int for indices of timeseries.
+            if isinstance(self.ts['date'][0], np.datetime64):
+                counts['date'] = counts['date'].astype(f'''datetime64[{self.time_step}]''')
+            elif isinstance(self.ts['date'][0], str):
+                counts['date'] = counts['date'].astype(f'''datetime64[{self.time_step}]''')
+            else:
+                counts['date'] = counts['date'].astype(int)
+
         # call functions to find counts
         if self.reversal > 1:
             counts = self.counts_reversal_greater_1(counts)
 
         elif self.reversal == 1:
-            counts = self.counts_reversal_is_1(counts)
+            counts = self.counts_reversal_equals_1(counts)
 
         # delete NaNs
         x = np.argwhere(np.isnan(counts['reward']))
@@ -2270,7 +2327,8 @@ class PointFigureChart:
         counts = temp_counts
 
         self.counts = counts
-        #return counts
+
+        return counts
 
     def _get_midpoints(self):
         """
@@ -3044,7 +3102,7 @@ class PointFigureChart:
 
         self.ax2.set_ylim(bottom=-0.5, top=np.shape(self.plot_matrix)[0] - 0.5)
 
-        # third axis is to allow y-ticks with labels on the ight of the chart
+        # third axis is to allow y-ticks with labels on the right of the chart
         self.ax3 = self.ax2.twinx()
         self.ax3.set_xticks([])
 
@@ -3527,6 +3585,7 @@ if __name__ == '__main__':
             close = [525, 485, 500, 460, 480, 455, 475, 460, 490, 475, 490, 475, 545, 505, 525, 500, 515, 500, 545]
 
             method = 'cl'
+            scaling = 'abs'
             reversal = 3
             boxsize = 5
 
@@ -3541,6 +3600,7 @@ if __name__ == '__main__':
                     485, 505, 485, 500, 460]
 
             method = 'cl'
+            scaling = 'abs'
             reversal = 3
             boxsize = 5
 
@@ -3566,20 +3626,22 @@ if __name__ == '__main__':
                      1230, 1210, 1230, 1220, 1230]  # , 1240]
 
             method = 'cl'
+            scaling = 'abs'
             reversal = 1
             boxsize = 10
 
     ts = {'Close': close}
 
-    pnf = PointFigureChart(ts=ts, method=method, reversal=reversal, boxsize=boxsize, scaling='abs',
-                           title='Horizontal Counts Example')
+    pnf = PointFigureChart(ts=ts, method=method, reversal=reversal, boxsize=boxsize, scaling=scaling,
+                           title=example)
 
     pnf.show_breakouts = True
     pnf.show_counts = True
     pnf.get_counts()
 
-    breakouts = pd.DataFrame.from_dict(pnf.breakouts)
-    print(breakouts)
+    # print(pd.DataFrame.from_dict(pnf.ts))
+
+    print(pd.DataFrame.from_dict(pnf.breakouts))
 
     counts = pd.DataFrame.from_dict(pnf.counts)
     print(counts[['trend','box index', 'length', 'type','target', 'reward', 'risk 1', 'risk 2']])
