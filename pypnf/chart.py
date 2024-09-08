@@ -2258,6 +2258,52 @@ class PointFigureChart:
 
     def get_counts(self):
 
+        """
+        Gets counts (per Chapter 5 of "Definitive Guide to Point and Figure" [2012], du Plessis) from a PointFigureChart object.
+
+        Returns:
+        ========
+
+        counts: dict
+            date: datetime64
+                
+            ts index: int64
+
+            column index: int64
+
+            box index: int64
+
+            box: float64
+            
+            trend: object
+                 Detailed description in get_trendline-method.
+            type: object
+                <description needed>
+            length: int64       
+                <description needed>
+            anchor column: int64
+                <description needed>
+            anchor box: float64
+                <description needed> 
+            target index: int64
+                <description needed>
+            target: float64
+                <good description needed (?varies by count method?)> - per du Plessis (above)
+            reward: float64
+                [per Chapter 5 p.222-232 (book), du Plessis (above)]
+            risk 1: float64
+                <good description needed (?varies by count method?)> - per du Plessis (above)
+            risk 2: float64
+                <good description needed (?varies by count method?)> - per du Plessis (above)
+            ratio 1: float64
+                reward / risk 1 [per du Plessis (above)]
+            ratio 2: float64
+                reward / risk 2 [per du Plessis (above)]
+            quality: float64
+                <description needed>
+
+        """
+
         if not self.breakouts:
             self.get_breakouts()
 
