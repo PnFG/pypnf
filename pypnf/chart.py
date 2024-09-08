@@ -2276,11 +2276,16 @@ class PointFigureChart:
             box: float64
             
             trend: object
+                 -1 (aka BEARISH)
+                 1 (aka BULLISH)
                  Detailed description in get_trendline-method.
             type: object
-                <description needed>
+                <description needed ?count type?>
+                vertical
+                horizontal R>1
+                horizontal R=1
             length: int64       
-                <description needed>
+                <description needed - ? column height ?>
             anchor column: int64
                 <description needed>
             anchor box: float64
